@@ -15,7 +15,8 @@ data FbGame = FbGame{
     barSlit :: Float,
     barPos :: Float,
     barSpeed :: Float,
-    bgPos :: Float,
+    bg0Pos :: Float,
+    bg1Pos :: Float,
     rds :: [Float],
     score :: Int,
 --  0:Start, 1:Normal, 2:Pause, 3:Dead, 4:Cheat
@@ -43,7 +44,7 @@ size_y_window = 800
 speed_bar  = -200
 speed_bird = 300
 speed_delta = -15
-speed_grav = 500
+speed_grav = 600
 
 title = "Flappy Bird in Haskell!!!"
 
@@ -58,7 +59,8 @@ initialState fs = FbGame {
     barSlit=0,
     barPos=0,
     barSpeed=speed_bar,
-    bgPos=0,
+    bg0Pos=0,
+    bg1Pos=0,
     rds=fs,
     score = 0,
     gameMode=0}
@@ -67,8 +69,8 @@ initialState fs = FbGame {
 getSprite :: String -> FilePath
 getSprite name = "sprites/" ++ name ++ ".bmp"
 
-bg0 = unsafePerformIO . loadBMP . getSprite $ "bg0"
-bg1 = translate 512 0 . unsafePerformIO . loadBMP . getSprite $ "bg1"
+bg0Pic = translate (1024-size_x_window/2) 0 . unsafePerformIO . loadBMP . getSprite $ "bg0"
+bg1Pic = translate (1024-size_x_window/2) 0 . unsafePerformIO . loadBMP . getSprite $ "bg1"
 birdAlive = scale 0.5 0.5 . unsafePerformIO . loadBMP . getSprite $ "bird0"
 birdDead = scale 0.5 0.5 . unsafePerformIO . loadBMP . getSprite $ "bird1"
 botBar = scale 2 2 . unsafePerformIO . loadBMP . getSprite $ "bot"
@@ -143,9 +145,9 @@ render game
     | otherwise = pictures [standard]
   where
     standard = pictures [
-        bg0,
+        bg0 (bg0Pos game),
         bar (barPos game) (barSlit game),
-        bg (bgPos game),
+        bg1 (bg1Pos game),
         bird (birdPos game) (birdStatus game),
         --debug game,
         scoreGen (score game)]
@@ -177,11 +179,13 @@ moveBar sec game = game {
     rNew = tail r
 
 moveBg :: Float -> FbGame -> FbGame
-moveBg sec game = game{bgPos=p'}
+moveBg sec game = game {bg0Pos=p0', bg1Pos=p1'}
   where
-    (p,v) = (bgPos game, barSpeed game)
-    p'  | p > (-1024)  = p + (v-100)*sec
-        | otherwise    = p + (v-100)*sec +1024
+    (p0,p1,v) = (bg0Pos game, bg1Pos game, barSpeed game)
+    p0' | p0 > (-2048) = p0 + (v*0.1)*sec
+        | otherwise    = p0 + (v*0.1)*sec +2048
+    p1' | p1 > (-1024) = p1 + (v-100)*sec
+        | otherwise    = p1 + (v-100)*sec +1024
 
 bird :: Float -> Int -> Picture
 bird y s = translate (0-size_x_window/4) y (sprite s)
@@ -196,7 +200,8 @@ bird y s = translate (0-size_x_window/4) y (sprite s)
 bar :: Float -> Float -> Picture
 bar x y = translate x (-y) barGen
 
-bg x = translate x 0 bg1
+bg0 x = translate x 0 bg0Pic
+bg1 x = translate x 0 bg1Pic
 
 debug :: FbGame -> Picture
 debug game = pictures [text $ show (barSpeed game)]
@@ -226,3 +231,14 @@ nums = unsafePerformIO . loadBMP . getSprite $ "num"
 
 pic2bmp :: Picture -> BitmapData
 pic2bmp (Bitmap bmpData) = bmpData
+
+displayList :: [Int] -> IO()
+displayList = putStrLn . helper
+  where
+    helper :: [Int] -> String
+    helper [] = ""
+    helper (n:ns) = show n ++ helper ns
+
+displayList' :: [Int] -> IO()
+displayList' [] = putStrLn ""
+displayList' (n:ns) =  putStr (show n) >> displayList' ns
